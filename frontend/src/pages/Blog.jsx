@@ -1,95 +1,95 @@
-const Blog = () => {
-  const posts = [
-    {
-      id: 1,
-      img: "/assets/img/person-f-1.webp",
-      category: "Politics",
-      title: "Dolorum optio tempore voluptas dignissimos",
-      author: "Maria Doe",
-      authorImg: "/assets/img/person-f-1.webp",
-      date: "Jan 1, 2022",
-    },
-    {
-      id: 2,
-      img: "/assets/img/person-f-2.webp",
-      category: "Sports",
-      title: "Nisi magni odit consequatur autem nulla dolorem",
-      author: "Allisa Mayer",
-      authorImg: "/assets/img/person-f-2.webp",
-      date: "Jun 5, 2022",
-    },
-    {
-      id: 3,
-      img: "/assets/img/person-f-3.webp",
-      category: "Entertainment",
-      title: "Possimus soluta ut id suscipit ea ut in quo quia et soluta",
-      author: "Mark Dower",
-      authorImg: "/assets/img/person-f-3.webp",
-      date: "Jun 22, 2022",
-    },
-    {
-      id: 4,
-      img: "/assets/img/person-f-4.webp",
-      category: "Sports",
-      title: "Non rem rerum nam cum quo minus olor distincti",
-      author: "Lisa Neymar",
-      authorImg: "/assets/img/person-f-4.webp",
-      date: "Jun 30, 2022",
-    },
-    {
-      id: 5,
-      img: "/assets/img/person-f-5.webp",
-      category: "Politics",
-      title: "Accusamus quaerat aliquam qui debitis facilis consequatur",
-      author: "Denis Peterson",
-      authorImg: "/assets/img/person-f-5.webp",
-      date: "Jan 30, 2022",
-    },
-    {
-      id: 6,
-      img: "/assets/img/person-f-6.webp",
-      category: "Entertainment",
-      title: "Distinctio provident quibusdam numquam aperiam aut",
-      author: "Mika Lendon",
-      authorImg: "/assets/img/person-f-6.webp",
-      date: "Feb 14, 2022",
-    },
-  ];
+// Blog.jsx
+import { useState, useEffect } from "react";
+import { fetchPosts } from "../services/postService";
 
-  const sidePosts = [
-    {
-      id: 1,
-      img: "/assets/img/person-f-1.webp",
-      category: "Entertainment",
-      title: "Maecenas tempus tellus eget condimentum rhoncus semper quam",
-      date: "March 15, 2025",
-      comments: 3,
-    },
-    {
-      id: 2,
-      img: "/assets/img/person-f-2.webp",
-      category: "Technology",
-      title: "Donec pede justo fringilla vel aliquet nec vulputate eget",
-      date: "March 14, 2025",
-      comments: 5,
-    },
-    {
-      id: 3,
-      img: "/assets/img/person-f-3.webp",
-      category: "Technology",
-      title: "Aenean vulputate eleifend tellus aenean leo ligula porttitor",
-      date: "March 13, 2025",
-      comments: 2,
-    },
-    {
-      id: 4,
-      img: "/assets/img/person-f-4.webp",
-      category: "Lifestyle",
-      title: "Etiam sit amet orci eget eros faucibus tincidunt duis leo",
-      date: "March 12, 2025",
-      comments: 4,
-    },
-  ];
+const Blog = () => {
+  const [posts, setPosts] = useState([]);
+  const [sidePosts, setSidePosts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [pagination, setPagination] = useState({
+    currentPage: 1,
+    totalPages: 1,
+    totalItems: 0,
+    pageSize: 9, // مطابق با CustomPagination پیش‌فرض (10) - می‌توانید 9 بگذارید
+  });
+
+  // دریافت پست‌های اصلی با صفحه‌بندی
+  const loadPosts = async (page = 1) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const params = { page, page_size: pagination.pageSize };
+      const response = await fetchPosts(params);
+      // پاسخ API مطابق با CustomPagination:
+      // { results: [...], current_page, total_pages, total_items, page_size }
+      setPosts(response.data.results || []);
+      setPagination({
+        currentPage: response.data.current_page,
+        totalPages: response.data.total_pages,
+        totalItems: response.data.total_items,
+        pageSize: response.data.page_size,
+      });
+    } catch (err) {
+      console.error("Error fetching posts:", err);
+      setError("مشکلی در دریافت پست‌ها پیش آمد. لطفاً دوباره تلاش کنید.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // دریافت پست‌های جدید برای سایدبار (بدون صفحه‌بندی، ۴ تای اخیر)
+  const loadSidePosts = async () => {
+    try {
+      const response = await fetchPosts({ page: 1, page_size: 4 });
+      setSidePosts(response.data.results || []);
+    } catch (err) {
+      console.error("Error fetching side posts:", err);
+    }
+  };
+
+  useEffect(() => {
+    loadPosts(1);
+    loadSidePosts();
+  }, []);
+
+  const handlePageChange = (newPage) => {
+    if (newPage >= 1 && newPage <= pagination.totalPages) {
+      loadPosts(newPage);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  };
+
+  // کمکی برای فرمت تاریخ (اختیاری)
+  const formatDate = (dateString) => {
+    if (!dateString) return "";
+    const date = new Date(dateString);
+    return date.toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  };
+
+  if (loading && posts.length === 0) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <div className="text-teal-600 text-xl">در حال بارگذاری پست‌ها...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <div className="text-red-500 text-xl">{error}</div>
+      </div>
+    );
+  }
+
+  // جدا کردن اولین پست به عنوان پست اصلی (featured) در میانه صفحه (اختیاری)
+  const featuredPost = posts.length > 0 ? posts[0] : null;
+  const remainingPosts = posts.slice(1);
 
   return (
     <div>
@@ -113,16 +113,18 @@ const Blog = () => {
       <section className="py-12 bg-white">
         <div className="container mx-auto px-4">
           <div className="grid lg:grid-cols-12 gap-8">
+            {/* سایدبار چپ: ۲ پست اول سایدبار */}
             <div className="lg:col-span-3 space-y-8">
               {sidePosts.slice(0, 2).map((post) => (
                 <article key={post.id} className="group">
                   <div className="relative overflow-hidden rounded-xl">
-                    <img src={post.img} alt={post.title} className="w-full h-48 object-cover transition-transform group-hover:scale-105" />
-                    <span className={`absolute top-3 left-3 text-xs text-white px-2 py-1 rounded ${
-                      post.category === "Entertainment" ? "bg-red-500" : 
-                      post.category === "Technology" ? "bg-green-500" : "bg-purple-500"
-                    }`}>
-                      {post.category}
+                    <img
+                      src={post.featured_image || "/assets/img/person-f-1.webp"}
+                      alt={post.title}
+                      className="w-full h-48 object-cover transition-transform group-hover:scale-105"
+                    />
+                    <span className="absolute top-3 left-3 text-xs text-white px-2 py-1 rounded bg-emerald-600">
+                      {post.categories?.[0]?.name || "General"}
                     </span>
                   </div>
                   <div className="mt-4">
@@ -132,49 +134,58 @@ const Blog = () => {
                       </a>
                     </h3>
                     <div className="text-sm text-teal-500 mt-2">
-                      <span>{post.date}</span>
+                      <span>{formatDate(post.published_date)}</span>
                       <span className="mx-1">•</span>
-                      <span>{post.comments} Comments</span>
+                      <span>{post.comments_count || 0} Comments</span>
                     </div>
                   </div>
                 </article>
               ))}
             </div>
 
+            {/* ستون میانی: پست اصلی (featured) */}
             <div className="lg:col-span-6">
-              <article className="group">
-                <div className="relative overflow-hidden rounded-xl">
-                  <img src="/assets/img/person-f-5.webp" alt="Main post" className="w-full h-80 object-cover transition-transform group-hover:scale-105" />
-                  <span className="absolute top-4 left-4 bg-blue-600 text-white text-sm px-3 py-1 rounded-full">Business</span>
-                </div>
-                <div className="mt-6">
-                  <h2 className="text-2xl md:text-3xl font-bold">
-                    <a href="/blog/main" className="hover:text-emerald-600 transition">
-                      Curabitur ullamcorper ultricies nisi nam eget dui etiam rhoncus
-                    </a>
-                  </h2>
-                  <p className="text-teal-600 mt-3">
-                    Nam quam nunc, blandit vel, luctus pulvinar, hendrerit id, lorem. Maecenas nec odio et ante tincidunt tempus.
-                  </p>
-                  <div className="text-sm text-teal-500 mt-4">
-                    <span>March 16, 2025</span>
-                    <span className="mx-1">•</span>
-                    <span>8 Comments</span>
+              {featuredPost && (
+                <article className="group">
+                  <div className="relative overflow-hidden rounded-xl">
+                    <img
+                      src={featuredPost.featured_image || "/assets/img/person-f-5.webp"}
+                      alt={featuredPost.title}
+                      className="w-full h-80 object-cover transition-transform group-hover:scale-105"
+                    />
+                    <span className="absolute top-4 left-4 bg-blue-600 text-white text-sm px-3 py-1 rounded-full">
+                      {featuredPost.categories?.[0]?.name || "Business"}
+                    </span>
                   </div>
-                </div>
-              </article>
+                  <div className="mt-6">
+                    <h2 className="text-2xl md:text-3xl font-bold">
+                      <a href={`/blog/${featuredPost.id}`} className="hover:text-emerald-600 transition">
+                        {featuredPost.title}
+                      </a>
+                    </h2>
+                    <p className="text-teal-600 mt-3">{featuredPost.excerpt}</p>
+                    <div className="text-sm text-teal-500 mt-4">
+                      <span>{formatDate(featuredPost.published_date)}</span>
+                      <span className="mx-1">•</span>
+                      <span>{featuredPost.comments_count || 0} Comments</span>
+                    </div>
+                  </div>
+                </article>
+              )}
             </div>
 
+            {/* سایدبار راست: ۲ پست بعدی سایدبار */}
             <div className="lg:col-span-3 space-y-8">
               {sidePosts.slice(2, 4).map((post) => (
                 <article key={post.id} className="group">
                   <div className="relative overflow-hidden rounded-xl">
-                    <img src={post.img} alt={post.title} className="w-full h-48 object-cover transition-transform group-hover:scale-105" />
-                    <span className={`absolute top-3 left-3 text-xs text-white px-2 py-1 rounded ${
-                      post.category === "Lifestyle" ? "bg-pink-500" : 
-                      post.category === "Technology" ? "bg-green-500" : "bg-red-500"
-                    }`}>
-                      {post.category}
+                    <img
+                      src={post.featured_image || "/assets/img/person-f-3.webp"}
+                      alt={post.title}
+                      className="w-full h-48 object-cover transition-transform group-hover:scale-105"
+                    />
+                    <span className="absolute top-3 left-3 text-xs text-white px-2 py-1 rounded bg-emerald-600">
+                      {post.categories?.[0]?.name || "General"}
                     </span>
                   </div>
                   <div className="mt-4">
@@ -184,9 +195,9 @@ const Blog = () => {
                       </a>
                     </h3>
                     <div className="text-sm text-teal-500 mt-2">
-                      <span>{post.date}</span>
+                      <span>{formatDate(post.published_date)}</span>
                       <span className="mx-1">•</span>
-                      <span>{post.comments} Comments</span>
+                      <span>{post.comments_count || 0} Comments</span>
                     </div>
                   </div>
                 </article>
@@ -196,26 +207,37 @@ const Blog = () => {
         </div>
       </section>
 
+      {/* لیست بقیه پست‌ها (گرید ۳ ستونه) */}
       <section className="py-16 bg-teal-50">
         <div className="container mx-auto px-4">
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {posts.map((post) => (
+            {remainingPosts.map((post) => (
               <article key={post.id} className="bg-white rounded-2xl shadow-md overflow-hidden group">
                 <div className="overflow-hidden">
-                  <img src={post.img} alt={post.title} className="w-full h-56 object-cover transition-transform group-hover:scale-105" />
+                  <img
+                    src={post.featured_image || "/assets/img/person-f-1.webp"}
+                    alt={post.title}
+                    className="w-full h-56 object-cover transition-transform group-hover:scale-105"
+                  />
                 </div>
                 <div className="p-5">
-                  <p className="text-sm text-emerald-600 font-semibold mb-2">{post.category}</p>
+                  <p className="text-sm text-emerald-600 font-semibold mb-2">
+                    {post.categories?.[0]?.name || "Uncategorized"}
+                  </p>
                   <h3 className="text-xl font-bold mb-3">
                     <a href={`/blog/${post.id}`} className="hover:text-emerald-600 transition">
                       {post.title}
                     </a>
                   </h3>
                   <div className="flex items-center gap-3 mt-4">
-                    <img src={post.authorImg} alt={post.author} className="w-10 h-10 rounded-full object-cover" />
+                    <img
+                      src={post.author?.image || "/assets/img/person-f-1.webp"}
+                      alt={post.author?.name || "Author"}
+                      className="w-10 h-10 rounded-full object-cover"
+                    />
                     <div>
-                      <p className="font-medium text-teal-800">{post.author}</p>
-                      <p className="text-sm text-teal-500">{post.date}</p>
+                      <p className="font-medium text-teal-800">{post.author?.name || "Unknown"}</p>
+                      <p className="text-sm text-teal-500">{formatDate(post.published_date)}</p>
                     </div>
                   </div>
                 </div>
@@ -225,29 +247,74 @@ const Blog = () => {
         </div>
       </section>
 
-      {/* Pagination */}
+      {/* صفحه‌بندی داینامیک */}
       <section className="py-12 bg-white">
         <div className="container mx-auto px-4">
           <nav className="flex justify-center">
             <ul className="flex flex-wrap gap-2">
               <li>
-                <a href="#" className="flex items-center gap-1 px-3 py-2 border rounded-lg hover:bg-emerald-50 hover:text-emerald-600 transition">
+                <button
+                  onClick={() => handlePageChange(pagination.currentPage - 1)}
+                  disabled={pagination.currentPage === 1}
+                  className={`flex items-center gap-1 px-3 py-2 border rounded-lg transition ${
+                    pagination.currentPage === 1
+                      ? "opacity-50 cursor-not-allowed"
+                      : "hover:bg-emerald-50 hover:text-emerald-600"
+                  }`}
+                >
                   <i className="bi bi-arrow-left"></i>
                   <span className="hidden sm:inline">Previous</span>
-                </a>
+                </button>
               </li>
-              <li><a href="#" className="px-3 py-2 border rounded-lg bg-emerald-600 text-white">1</a></li>
-              <li><a href="#" className="px-3 py-2 border rounded-lg hover:bg-emerald-50 hover:text-emerald-600">2</a></li>
-              <li><a href="#" className="px-3 py-2 border rounded-lg hover:bg-emerald-50 hover:text-emerald-600">3</a></li>
-              <li className="px-3 py-2 text-teal-400">...</li>
-              <li><a href="#" className="px-3 py-2 border rounded-lg hover:bg-emerald-50 hover:text-emerald-600">8</a></li>
-              <li><a href="#" className="px-3 py-2 border rounded-lg hover:bg-emerald-50 hover:text-emerald-600">9</a></li>
-              <li><a href="#" className="px-3 py-2 border rounded-lg hover:bg-emerald-50 hover:text-emerald-600">10</a></li>
+
+              {/* تولید دکمه‌های صفحه‌بندی */}
+              {Array.from({ length: pagination.totalPages }, (_, i) => i + 1).map((page) => {
+                // نمایش صفحه فعلی، صفحات اول و آخر و حداکثر ۲ صفحه اطراف
+                if (
+                  page === 1 ||
+                  page === pagination.totalPages ||
+                  (page >= pagination.currentPage - 1 && page <= pagination.currentPage + 1)
+                ) {
+                  return (
+                    <li key={page}>
+                      <button
+                        onClick={() => handlePageChange(page)}
+                        className={`px-3 py-2 border rounded-lg ${
+                          page === pagination.currentPage
+                            ? "bg-emerald-600 text-white"
+                            : "hover:bg-emerald-50 hover:text-emerald-600"
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    </li>
+                  );
+                } else if (
+                  (page === pagination.currentPage - 2 && pagination.currentPage > 3) ||
+                  (page === pagination.currentPage + 2 && pagination.currentPage < pagination.totalPages - 2)
+                ) {
+                  return (
+                    <li key={page} className="px-3 py-2 text-teal-400">
+                      ...
+                    </li>
+                  );
+                }
+                return null;
+              })}
+
               <li>
-                <a href="#" className="flex items-center gap-1 px-3 py-2 border rounded-lg hover:bg-emerald-50 hover:text-emerald-600 transition">
+                <button
+                  onClick={() => handlePageChange(pagination.currentPage + 1)}
+                  disabled={pagination.currentPage === pagination.totalPages}
+                  className={`flex items-center gap-1 px-3 py-2 border rounded-lg transition ${
+                    pagination.currentPage === pagination.totalPages
+                      ? "opacity-50 cursor-not-allowed"
+                      : "hover:bg-emerald-50 hover:text-emerald-600"
+                  }`}
+                >
                   <span className="hidden sm:inline">Next</span>
                   <i className="bi bi-arrow-right"></i>
-                </a>
+                </button>
               </li>
             </ul>
           </nav>
