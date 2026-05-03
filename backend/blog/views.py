@@ -40,10 +40,11 @@ class PostViewSet(ModelViewSet):
     queryset = Post.objects.filter(status="published")
     permission_classes = [IsAuthenticatedOrReadOnly, IsOwnerOrReadOnly]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
-    filterset_fields = ["categories", "author", "status"]
+    filterset_fields = ["categories", "author", "tags", "status"]
     search_fields = ["title", "content"]
     ordering_fields = ["published_date"]
     pagination_class = CustomPagination
+    lookup_field = "slug"
 
     def get_queryset(self):
         """

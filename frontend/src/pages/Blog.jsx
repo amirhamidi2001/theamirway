@@ -1,8 +1,10 @@
 // Blog.jsx
 import { useState, useEffect } from "react";
 import { fetchPosts } from "../services/postService";
+import api from "../services/api"; // for fetching filter options
 
 const Blog = () => {
+  // Posts and pagination state
   const [posts, setPosts] = useState([]);
   const [sidePosts, setSidePosts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -11,18 +13,53 @@ const Blog = () => {
     currentPage: 1,
     totalPages: 1,
     totalItems: 0,
-    pageSize: 9, // مطابق با CustomPagination پیش‌فرض (10) - می‌توانید 9 بگذارید
+    pageSize: 9,
   });
 
-  // دریافت پست‌های اصلی با صفحه‌بندی
+  // Filter state
+  const [filters, setFilters] = useState({
+    category: "",
+    tag: "",
+    author: "",
+  });
+
+  // Filter options from API
+  const [categories, setCategories] = useState([]);
+  const [tags, setTags] = useState([]);
+  const [authors, setAuthors] = useState([]);
+
+  // Fetch filter options (categories, tags, authors)
+  useEffect(() => {
+    const fetchFilterOptions = async () => {
+      try {
+        const [catRes, tagRes, authRes] = await Promise.all([
+          api.get("/blog/categories/"),
+          api.get("/blog/tags/"),
+          api.get("/blog/authors/"),
+        ]);
+        setCategories(catRes.data);
+        setTags(tagRes.data);
+        setAuthors(authRes.data);
+      } catch (err) {
+        console.error("Error loading filter options:", err);
+      }
+    };
+    fetchFilterOptions();
+  }, []);
+
+  // Fetch main posts with pagination and filters
   const loadPosts = async (page = 1) => {
     setLoading(true);
     setError(null);
     try {
-      const params = { page, page_size: pagination.pageSize };
+      const params = {
+        page,
+        page_size: pagination.pageSize,
+        ...(filters.category && { categories: filters.category }),
+        ...(filters.tag && { tags: filters.tag }),
+        ...(filters.author && { author: filters.author }),
+      };
       const response = await fetchPosts(params);
-      // پاسخ API مطابق با CustomPagination:
-      // { results: [...], current_page, total_pages, total_items, page_size }
       setPosts(response.data.results || []);
       setPagination({
         currentPage: response.data.current_page,
@@ -32,13 +69,13 @@ const Blog = () => {
       });
     } catch (err) {
       console.error("Error fetching posts:", err);
-      setError("مشکلی در دریافت پست‌ها پیش آمد. لطفاً دوباره تلاش کنید.");
+      setError("Failed to load posts. Please try again.");
     } finally {
       setLoading(false);
     }
   };
 
-  // دریافت پست‌های جدید برای سایدبار (بدون صفحه‌بندی، ۴ تای اخیر)
+  // Fetch latest posts for sidebar (4 most recent) – always unfiltered
   const loadSidePosts = async () => {
     try {
       const response = await fetchPosts({ page: 1, page_size: 4 });
@@ -48,6 +85,12 @@ const Blog = () => {
     }
   };
 
+  // Reload posts whenever filters change (reset to page 1)
+  useEffect(() => {
+    loadPosts(1);
+  }, [filters]);
+
+  // Initial load
   useEffect(() => {
     loadPosts(1);
     loadSidePosts();
@@ -60,7 +103,15 @@ const Blog = () => {
     }
   };
 
-  // کمکی برای فرمت تاریخ (اختیاری)
+  const handleFilterChange = (filterType, value) => {
+    setFilters((prev) => ({ ...prev, [filterType]: value }));
+  };
+
+  const clearFilters = () => {
+    setFilters({ category: "", tag: "", author: "" });
+  };
+
+  // Helper to format date
   const formatDate = (dateString) => {
     if (!dateString) return "";
     const date = new Date(dateString);
@@ -74,7 +125,7 @@ const Blog = () => {
   if (loading && posts.length === 0) {
     return (
       <div className="flex justify-center items-center min-h-screen">
-        <div className="text-teal-600 text-xl">در حال بارگذاری پست‌ها...</div>
+        <div className="text-teal-600 text-xl">Loading posts...</div>
       </div>
     );
   }
@@ -87,7 +138,6 @@ const Blog = () => {
     );
   }
 
-  // جدا کردن اولین پست به عنوان پست اصلی (featured) در میانه صفحه (اختیاری)
   const featuredPost = posts.length > 0 ? posts[0] : null;
   const remainingPosts = posts.slice(1);
 
@@ -110,10 +160,11 @@ const Blog = () => {
         </div>
       </section>
 
+      {/* Blog Layout */}
       <section className="py-12 bg-white">
         <div className="container mx-auto px-4">
           <div className="grid lg:grid-cols-12 gap-8">
-            {/* سایدبار چپ: ۲ پست اول سایدبار */}
+            {/* Left Sidebar: First 2 sidebar posts */}
             <div className="lg:col-span-3 space-y-8">
               {sidePosts.slice(0, 2).map((post) => (
                 <article key={post.id} className="group">
@@ -129,7 +180,7 @@ const Blog = () => {
                   </div>
                   <div className="mt-4">
                     <h3 className="text-lg font-bold">
-                      <a href={`/blog/${post.id}`} className="hover:text-emerald-600 transition">
+                      <a href={`/blog/${post.slug}`} className="hover:text-emerald-600 transition">
                         {post.title}
                       </a>
                     </h3>
@@ -143,7 +194,7 @@ const Blog = () => {
               ))}
             </div>
 
-            {/* ستون میانی: پست اصلی (featured) */}
+            {/* Middle Column: Featured Post */}
             <div className="lg:col-span-6">
               {featuredPost && (
                 <article className="group">
@@ -159,7 +210,7 @@ const Blog = () => {
                   </div>
                   <div className="mt-6">
                     <h2 className="text-2xl md:text-3xl font-bold">
-                      <a href={`/blog/${featuredPost.id}`} className="hover:text-emerald-600 transition">
+                      <a href={`/blog/${featuredPost.slug}`} className="hover:text-emerald-600 transition">
                         {featuredPost.title}
                       </a>
                     </h2>
@@ -174,7 +225,7 @@ const Blog = () => {
               )}
             </div>
 
-            {/* سایدبار راست: ۲ پست بعدی سایدبار */}
+            {/* Right Sidebar: Next 2 sidebar posts */}
             <div className="lg:col-span-3 space-y-8">
               {sidePosts.slice(2, 4).map((post) => (
                 <article key={post.id} className="group">
@@ -190,7 +241,7 @@ const Blog = () => {
                   </div>
                   <div className="mt-4">
                     <h3 className="text-lg font-bold">
-                      <a href={`/blog/${post.id}`} className="hover:text-emerald-600 transition">
+                      <a href={`/blog/${post.slug}`} className="hover:text-emerald-600 transition">
                         {post.title}
                       </a>
                     </h3>
@@ -207,7 +258,7 @@ const Blog = () => {
         </div>
       </section>
 
-      {/* لیست بقیه پست‌ها (گرید ۳ ستونه) */}
+      {/* Remaining Posts Grid (3 columns) */}
       <section className="py-16 bg-teal-50">
         <div className="container mx-auto px-4">
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -225,7 +276,7 @@ const Blog = () => {
                     {post.categories?.[0]?.name || "Uncategorized"}
                   </p>
                   <h3 className="text-xl font-bold mb-3">
-                    <a href={`/blog/${post.id}`} className="hover:text-emerald-600 transition">
+                    <a href={`/blog/${post.slug}`} className="hover:text-emerald-600 transition">
                       {post.title}
                     </a>
                   </h3>
@@ -247,7 +298,7 @@ const Blog = () => {
         </div>
       </section>
 
-      {/* صفحه‌بندی داینامیک */}
+      {/* Dynamic Pagination */}
       <section className="py-12 bg-white">
         <div className="container mx-auto px-4">
           <nav className="flex justify-center">
@@ -267,9 +318,7 @@ const Blog = () => {
                 </button>
               </li>
 
-              {/* تولید دکمه‌های صفحه‌بندی */}
               {Array.from({ length: pagination.totalPages }, (_, i) => i + 1).map((page) => {
-                // نمایش صفحه فعلی، صفحات اول و آخر و حداکثر ۲ صفحه اطراف
                 if (
                   page === 1 ||
                   page === pagination.totalPages ||

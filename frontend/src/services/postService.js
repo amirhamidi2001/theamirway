@@ -7,3 +7,7 @@ export const fetchPosts = (params = {}) => {
 export const fetchPostBySlug = (slug) => {
   return api.get(`/posts/${slug}/`);
 };
+
+export const fetchPostById = (id) => {
+  return api.get(`/posts/${id}/`);
+};

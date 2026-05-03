@@ -7,7 +7,3 @@ export const fetchCommentsByPost = (postId) => {
 export const createComment = (data) => {
   return api.post('/comments/', data);
 };
-
-export const fetchPostById = (id) => {
-  return api.get(`/posts/${id}/`);
-};

@@ -1,16 +1,17 @@
 import { useState, useEffect } from "react";
-import { useParams } from "react-router-dom";
-import { fetchPostById } from "../services/postService";
+import { useParams, useNavigate } from "react-router-dom";
+import { fetchPostBySlug } from "../services/postService";
 import { fetchCommentsByPost, createComment } from "../services/commentService";
 
 const BlogDetails = () => {
-  const { id } = useParams(); // id عددی پست
+  const { slug } = useParams();
+  const navigate = useNavigate();
   const [post, setPost] = useState(null);
   const [comments, setComments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // state فرم کامنت
+  // Comment form state
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -19,17 +20,15 @@ const BlogDetails = () => {
   });
   const [commentSubmitStatus, setCommentSubmitStatus] = useState("");
 
-  // دریافت جزئیات پست و کامنت‌ها
+  // Fetch post details and comments
   useEffect(() => {
     const fetchData = async () => {
-      if (!id) return;
+      if (!slug) return;
       try {
-        const [postRes, commentsRes] = await Promise.all([
-          fetchPostById(id),
-          fetchCommentsByPost(id),
-        ]);
-        setPost(postRes.data);
-        // پاسخ کامنت‌ها مطابق با CustomPagination ممکن است دارای 'results' باشد
+        const postRes = await fetchPostBySlug(slug);
+        const postData = postRes.data;
+        setPost(postData);
+        const commentsRes = await fetchCommentsByPost(postData.id);
         const commentsData = commentsRes.data.results || commentsRes.data;
         setComments(commentsData);
       } catch (err) {
@@ -40,20 +39,19 @@ const BlogDetails = () => {
       }
     };
     fetchData();
-  }, [id]);
+  }, [slug]);
 
-  // هندل کردن تغییرات فرم
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  // ارسال کامنت جدید با استفاده از سرویس
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!post) return;
     setCommentSubmitStatus("Submitting...");
     try {
       const payload = {
-        post: parseInt(id),
+        post: post.id,
         name: formData.name,
         email: formData.email,
         website: formData.website,
@@ -61,7 +59,6 @@ const BlogDetails = () => {
         parent: null,
       };
       const response = await createComment(payload);
-      // اضافه کردن کامنت جدید به ابتدای لیست
       setComments((prev) => [response.data, ...prev]);
       setFormData({ name: "", email: "", website: "", comment: "" });
       setCommentSubmitStatus("Comment posted successfully!");
@@ -70,6 +67,15 @@ const BlogDetails = () => {
       console.error("Error posting comment:", err);
       setCommentSubmitStatus("Failed to post comment. Please try again.");
     }
+  };
+
+  // Helper to navigate to blog with filter
+  const applyTagFilter = (tagId) => {
+    navigate(`/blog?tags=${tagId}`);
+  };
+
+  const applyCategoryFilter = (categoryId) => {
+    navigate(`/blog?categories=${categoryId}`);
   };
 
   if (loading) {
@@ -92,13 +98,9 @@ const BlogDetails = () => {
     );
   }
 
-  // محاسبه تعداد کامنت‌ها (با احتساب ریپلی‌ها – در صورت نیاز)
   const totalComments = comments.length;
-  // خواندن زمان مطالعه (از فیلد reading_time_str یا محاسبه دستی)
   const readingTime = post.reading_time_str || `${post.reading_time || 3} min read`;
-  // گرفتن اولین دسته‌بندی برای نمایش
-  const primaryCategory = post.categories?.[0]?.name || "General";
-  // تاریخ انتشار فرمت شده
+  const primaryCategory = post.categories?.[0];
   const publishedDate = new Date(post.published_date).toLocaleDateString("en-US", {
     year: "numeric",
     month: "short",
@@ -144,9 +146,14 @@ const BlogDetails = () => {
               />
               <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/70 to-transparent">
                 <div className="flex flex-wrap items-center gap-2 text-white text-sm">
-                  <a href="#" className="bg-emerald-600 px-3 py-1 rounded-full">
-                    {primaryCategory}
-                  </a>
+                  {primaryCategory && (
+                    <button
+                      onClick={() => applyCategoryFilter(primaryCategory.id)}
+                      className="bg-emerald-600 px-3 py-1 rounded-full hover:bg-emerald-700 transition"
+                    >
+                      {primaryCategory.name}
+                    </button>
+                  )}
                   <span className="mx-1">•</span>
                   <span>
                     <i className="bi bi-clock"></i> {readingTime}
@@ -191,7 +198,7 @@ const BlogDetails = () => {
                 </div>
               </div>
 
-              {/* محتوای اصلی – از API (متن ساده یا HTML) */}
+              {/* Main content */}
               <div
                 className="space-y-6"
                 dangerouslySetInnerHTML={{ __html: post.content }}
@@ -206,13 +213,13 @@ const BlogDetails = () => {
                     </h4>
                     <div className="flex flex-wrap gap-2">
                       {post.tags?.map((tag) => (
-                        <a
+                        <button
                           key={tag.id}
-                          href="#"
+                          onClick={() => applyTagFilter(tag.id)}
                           className="bg-teal-100 hover:bg-emerald-600 hover:text-white px-3 py-1 rounded-full text-sm transition"
                         >
                           {tag.name}
-                        </a>
+                        </button>
                       ))}
                       {(!post.tags || post.tags.length === 0) && (
                         <span className="text-teal-400">No tags</span>
@@ -257,7 +264,7 @@ const BlogDetails = () => {
         </div>
       </section>
 
-      {/* Comments Section */}
+      {/* Comments Section (unchanged) */}
       <section className="py-12 bg-teal-50">
         <div className="container mx-auto px-4 max-w-4xl">
           <div className="flex justify-between items-center mb-8 pb-4 border-b border-teal-200">
@@ -272,10 +279,9 @@ const BlogDetails = () => {
           <div className="space-y-8">
             {comments.map((comment) => (
               <div key={comment.id} className="space-y-6">
-                {/* Main comment */}
                 <div className="flex gap-4">
                   <img
-                    src="/assets/img/person-f-9.webp" // fallback avatar
+                    src="/assets/img/person-f-9.webp"
                     alt={comment.name}
                     className="w-12 h-12 rounded-full object-cover"
                   />
@@ -308,8 +314,6 @@ const BlogDetails = () => {
                         <i className="bi bi-share"></i> Share
                       </button>
                     </div>
-
-                    {/* Replies - در صورت داشتن parent در API (اختیاری) */}
                     {comment.replies && comment.replies.length > 0 && (
                       <div className="mt-6 ml-8 space-y-6">
                         {comment.replies.map((reply) => (
@@ -365,7 +369,7 @@ const BlogDetails = () => {
         </div>
       </section>
 
-      {/* Comment Form Section */}
+      {/* Comment Form Section (unchanged) */}
       <section className="py-12 bg-white">
         <div className="container mx-auto px-4 max-w-3xl">
           <div className="text-center mb-8">
