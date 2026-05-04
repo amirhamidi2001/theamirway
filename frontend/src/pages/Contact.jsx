@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { createContact } from "../services/contactService";
 
 const Contact = () => {
   const [formData, setFormData] = useState({
@@ -21,12 +22,17 @@ const Contact = () => {
     e.preventDefault();
     setStatus({ loading: true, error: "", success: false });
 
-    setTimeout(() => {
-      console.log("Form Data:", formData);
+    try {
+      await createContact(formData);
       setStatus({ loading: false, error: "", success: true });
       setFormData({ name: "", email: "", subject: "", message: "" });
+      // Clear success message after 3 seconds
       setTimeout(() => setStatus((prev) => ({ ...prev, success: false })), 3000);
-    }, 2000);
+    } catch (err) {
+      console.error("Contact submission error:", err);
+      const errorMsg = err.response?.data?.message || "Failed to send message. Please try again.";
+      setStatus({ loading: false, error: errorMsg, success: false });
+    }
   };
 
   return (
